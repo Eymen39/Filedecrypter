@@ -20,6 +20,7 @@ public class RSAFactory implements ICipherFactory {
     public RSAFactory() {
         try {
             keyGenerator = KeyPairGenerator.getInstance("RSA");
+            keyGenerator.initialize(4096);
             cipher = Cipher.getInstance("RSA");
             iv = new byte[16];
             new SecureRandom().nextBytes(iv);
@@ -61,7 +62,7 @@ public class RSAFactory implements ICipherFactory {
     public static Key convertStringToKey(String keyString) throws Exception {
         byte[] keyBytes = Base64.getDecoder().decode(keyString);
         keyString = null;
-        if (keyBytes.length < 700) {
+        if (keyBytes.length < 1000) {
             X509EncodedKeySpec spec = new X509EncodedKeySpec(keyBytes, "RSA"); // used to create a public key
             KeyFactory factory = KeyFactory.getInstance("RSA");
             return factory.generatePublic(spec);

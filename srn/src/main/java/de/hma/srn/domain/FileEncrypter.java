@@ -8,6 +8,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -35,16 +36,14 @@ import de.hma.srn.domain.BigBrainCipher.BigBrainCipher;
 import de.hma.srn.domain.BigBrainCipher.RSAFactory;
 import de.hma.srn.persistence.DbClient;
 
-//TODO fehlende Schreibrechte auf andere Verzeichnisse?? Ich kann die dateien selbst verschlüsseln aber nicht woanders ablegen
 public class FileEncrypter {
 
-    BigBrainCipher bbc;
-    String encryptedPath = "files/encryptedFiles/";
-    String decryptedPath = "files/decryptedFiles/";
-    PosixFilePermissions permissions;
-    FilePermissionManager filePermissionManager;
-    Boolean usesNotar = false;
-    String osName;
+    private BigBrainCipher bbc;
+    private String encryptedPath = "files/encryptedFiles/";
+    private String decryptedPath = "files/decryptedFiles/";
+    private FilePermissionManager filePermissionManager;
+    private Boolean usesNotar = false;
+    private String osName;
 
     public FileEncrypter() {
         bbc = new BigBrainCipher(new AESFactory());
@@ -57,7 +56,6 @@ public class FileEncrypter {
         if (!encryptedOrdner.exists()) {
             encryptedOrdner.mkdirs();
         }
-        this.osName = osName;
     }
 
     public void encryptFile(String keyString, String filepath)
@@ -66,11 +64,12 @@ public class FileEncrypter {
             Exception {
         BigBrainCipher hashFactory = new BigBrainCipher();
         SecretKey key = AESFactory.convertStringToSecretKey(keyString);
+        byte[] metaData = prepareMetaData(filepath, keyString);
+        keyString = null;
         String outputFile = encryptedPath + hashFactory.hashForFiles(filepath);
         FileInputStream fis = new FileInputStream(filepath);
         FileOutputStream fos = new FileOutputStream(outputFile);
 
-        byte[] metaData = prepareMetaData(filepath, keyString);
         byte[] iv = Arrays.copyOfRange(metaData, 0, 16);
 
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
@@ -92,46 +91,13 @@ public class FileEncrypter {
         fos.close();
     }
 
-    public void showFile(String keyString, String filePath) throws Exception {
-        BigBrainCipher hashFactory = new BigBrainCipher();
-        File tempFile0 = File.createTempFile("enryptedTemp", ".dat");
-        tempFile0.deleteOnExit();
-        String inputFile = encryptedPath + hashFactory.hashForFiles(filePath);
-
-        SecretKey key = AESFactory.convertStringToSecretKey(keyString);
-        FileInputStream fis = new FileInputStream(inputFile);
-        FileOutputStream fos = new FileOutputStream(tempFile0);
-
-        byte[] metaData = readMetaData(inputFile);
-        byte[] iv = Arrays.copyOfRange(metaData, 0, 16);
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
-        byte[] buffer = new byte[1024];
-        int bytesRead;
-        fis.read(new byte[metaData.length]);
-        while ((bytesRead = fis.read(buffer)) != -1) {
-            byte[] decrypted = cipher.update(buffer, 0, bytesRead);
-            fos.write(decrypted);
-        }
-
-        byte[] decrypted = cipher.doFinal();
-        fos.write(decrypted);
-        fos.close();
-        fis.close();
-
-        FilePresenter fp = new FilePresenter();
-        System.out.println(tempFile0.getAbsolutePath());
-
-        fp.openFile(tempFile0.getAbsolutePath());
-
-    }
-
     public void decryptFile(String keyString, String filePath, String ablageOrt)
             throws FileNotFoundException, IOException, NoSuchAlgorithmException, NoSuchPaddingException,
             InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
 
         BigBrainCipher hashFactory = new BigBrainCipher();
         String inputFile = encryptedPath + hashFactory.hashForFiles(filePath);
+
         File decyptedFile = new File(decryptedPath + extractFileName(filePath));
         decyptedFile.createNewFile();
 
@@ -144,6 +110,7 @@ public class FileEncrypter {
         byte[] iv = Arrays.copyOfRange(metaData, 0, 16);
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
+        key = null;
         byte[] buffer = new byte[1024];
         int bytesRead;
         fis.read(new byte[metaData.length]);
@@ -156,6 +123,8 @@ public class FileEncrypter {
         fos.write(decrypted);
         fos.close();
         fis.close();
+        key = null;
+        keyString = null;
         filePermissionManager.copyPermissions(inputFile, decryptedPath + extractFileName(filePath));
     }
 
@@ -173,6 +142,24 @@ public class FileEncrypter {
 
             // }
         }
+    }
+
+    public void deleteFile(String dateiName) {
+
+        String encryptedFilePath = "files/encryptedFiles/" + dateiName;
+        DbClient dbClient = DbClient.getInstance();
+        ArrayList<DataFile> dataAccesses = new ArrayList<>();
+        try {
+            dataAccesses = dbClient.getDataAccessOf1File(dateiName);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        if (dataAccesses.size() == 0) {
+            File datei = new File(encryptedFilePath);
+            datei.delete();
+        }
+
     }
 
     /*
@@ -206,20 +193,20 @@ public class FileEncrypter {
 
         new SecureRandom().nextBytes(iv);
         metaDataOutputStream.write(iv);
+        byte[] notarKey = new byte[512]; // because of 4096 byte NotarKey
 
         if (usesNotar) {
             String fileName = extractFileName(sourceFilePath);
 
-            byte[] notarKey = new byte[256];
-
             BigBrainCipher cipher = new BigBrainCipher(new RSAFactory());
             DbClient dbClient = DbClient.getInstance();
             String notarPublicKey = dbClient.getPublicKey(new User("notar", "0000"));
-            String dataToEncryt = AESKeyString + " " + fileName;
+            String dataToEncryt = AESKeyString + " " + fileName + " ";
             String notarEncryptedKeyBase = cipher.getFactory().encrypt(notarPublicKey, dataToEncryt.getBytes());
             notarKey = Base64.getDecoder().decode(notarEncryptedKeyBase);
-            metaDataOutputStream.write(notarKey);
         }
+        metaDataOutputStream.write(notarKey);
+        metaDataOutputStream.close();
 
         return metaDataOutputStream.toByteArray();
     }
@@ -240,17 +227,27 @@ public class FileEncrypter {
         fis.read(iv);
         metaDataOutputStream.write(iv);
 
-        if (usesNotar) {
-            byte[] notarInfo = new byte[256];
-            fis.read(notarInfo);
-            metaDataOutputStream.write(notarInfo);
-        }
+        byte[] notarInfo = new byte[512]; // because of 4096 RSA Notar key
+        fis.read(notarInfo);
+        metaDataOutputStream.write(notarInfo);
 
         fis.close();
+        metaDataOutputStream.close();
         return metaDataOutputStream.toByteArray();
     }
 
     public void setNotarReadInfo(Boolean usesNotar) {
         this.usesNotar = usesNotar;
+    }
+
+    public String readPemFile(File file) throws Exception {
+        String key = new String(Files.readAllBytes(file.toPath()), Charset.defaultCharset());
+
+        String publicKeyPEM = key
+                .replaceAll("-----BEGIN [^-]+-----", "")
+                .replaceAll("-----END [^-]+-----", "")
+                .replaceAll("\\s", "");
+
+        return publicKeyPEM;
     }
 }

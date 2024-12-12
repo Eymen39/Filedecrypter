@@ -70,6 +70,7 @@ public class RegistrationHandler {
         try {
             allUser = dbclient.getUserNames();
         } catch (SQLException e) {
+            e.printStackTrace();
             return 1;
         }
 

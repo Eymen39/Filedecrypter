@@ -37,9 +37,20 @@ public class PermissionManager {
 
         BigBrainCipher hashMaster = new BigBrainCipher();
         String hashName = hashMaster.hashForFiles(fileName);
+        DataFile DatafromUsertoGive = null;
+        try {
+            DatafromUsertoGive = client.getDataAccess(hashName, user.getId());
+        } catch (SQLException e) {
+            return 5;
+        }
+        if (DatafromUsertoGive != null) {
+            return 5;
+        }
         DataFile masterFile = new DataFile();
+        DataFile targetUserFile = new DataFile();
         try {
             masterFile = client.getDataAccess(hashName, loggedInUser.getUser().getId());
+            targetUserFile = client.getDataAccess(hashName, user.getId());
         } catch (SQLException e) {
             userPassword = null;
             return 4;
@@ -49,6 +60,9 @@ public class PermissionManager {
         }
         if (!masterFile.MasterId.equals(loggedInUser.getUser().getId())) {
             return 1;
+        }
+        if (targetUserFile != null) {
+            return 5;
         }
 
         bbc = new BigBrainCipher(new PBEFactory());
@@ -148,9 +162,5 @@ public class PermissionManager {
         } else {
             return 0;
         }
-    }
-
-    public void accessFile() {
-
     }
 }

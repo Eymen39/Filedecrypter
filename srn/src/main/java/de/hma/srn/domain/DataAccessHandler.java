@@ -5,8 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
-import java.nio.file.Paths;
-import java.security.Key;
+
 import java.security.NoSuchAlgorithmException;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -14,7 +13,6 @@ import java.util.ArrayList;
 import javax.crypto.BadPaddingException;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
 
 import de.hma.srn.domain.BigBrainCipher.AESFactory;
 import de.hma.srn.domain.BigBrainCipher.BigBrainCipher;
@@ -32,7 +30,7 @@ public class DataAccessHandler {
 
     public DataAccessHandler() {
         dbClient = DbClient.getInstance();
-
+        bbc = new BigBrainCipher();
         uiOutputs = new UIOutputs();
     }
 
@@ -40,7 +38,7 @@ public class DataAccessHandler {
      * 
      * @param Url
      * @return 0 wenn alles geht, 1 wenn der Key korrupt ist, 2 wenn die Datei nicht
-     *         existiert
+     *         existiert, 3 wenn die Datei schon verschlüsselt wurde
      */
 
     public int addFile(String Url) {
@@ -49,16 +47,24 @@ public class DataAccessHandler {
         bbc = new BigBrainCipher(new AESFactory());
 
         UserSingleton user = UserSingleton.getInstance();
-        // Dann DataValidator machen password angeben
-        // if (dataValidator.validate(user.getUser())) {
 
+        try {
+            for (DataFile data : dbClient.getDataAccessOf1File(bbc.hashForFiles(Url))) {
+                if (data.hashname.equals(bbc.hashForFiles(Url))) {
+                    return 3;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
         Boolean notarFlag = user.getUser().getNotarFlag();
         String publickey = null;
         try {
             publickey = dbClient.getPublicKey(user.getUser());
         } catch (SQLException e) {
 
-            uiOutputs.dataCorrupt();// Nutzer hat keinen PublicKey mehr oder der Nutzer existiert einfach net mehr
+            Crasher crasher = new Crasher();
+            crasher.systemCrasher();// Nutzer hat keinen PublicKey mehr oder der Nutzer existiert einfach net mehr
         }
         String key = (String) bbc.getFactory().createKey();
 
@@ -69,19 +75,21 @@ public class DataAccessHandler {
 
         } catch (SQLException e) {
             // wenn beim
-            uiOutputs.dataCorrupt();
-
+            key = null;
+            Crasher crasher = new Crasher();
+            crasher.systemCrasher();
         } catch (InvalidKeyException | NoSuchAlgorithmException | NoSuchPaddingException
                 | InvalidAlgorithmParameterException | IllegalBlockSizeException | BadPaddingException e) {
-
+            key = null;
             // Der benutzte PublicKey für die verschlüsselung ist kein richtiger Schlüssel
             return 1;
 
         } catch (IOException e) {
+            key = null;
             // Die Url existiert nicht wird von fE.encryptFile() geworfen
             return 2;
         } catch (Exception e) {
-
+            key = null;
             return 2;
         }
 
@@ -92,6 +100,7 @@ public class DataAccessHandler {
             encryptedKey = bbc.getFactory().encrypt(publickey, key.getBytes());
         } catch (Exception e) {
             // der PublicKey ist kein Key
+            key = null;
             return 1;
         }
         key = null;
@@ -101,6 +110,7 @@ public class DataAccessHandler {
             encryptedName = bbc.getFactory().encrypt(publickey, Url.getBytes());
         } catch (Exception e) {
             // der PublicKey ist kein Key
+
             return 1;
         }
 
@@ -160,7 +170,8 @@ public class DataAccessHandler {
         try {
             privateKey = dbClient.getPrivateKey(UserSingleton.getInstance().getUser());
         } catch (SQLException e) {
-            uiOutputs.dataCorrupt();
+            Crasher crasher = new Crasher();
+            crasher.systemCrasher();
             password = null;
         }
         bbc = new BigBrainCipher(new PBEFactory());
@@ -211,8 +222,8 @@ public class DataAccessHandler {
         try {
             return dbClient.getUserFileNames(UserSingleton.getInstance().getUser().getId());
         } catch (SQLException e) {
-            // TODO Auto-generated catch block
-            uiOutputs.dataCorrupt();
+            Crasher crasher = new Crasher();
+            crasher.systemCrasher();
             return null;
         }
 
@@ -222,6 +233,11 @@ public class DataAccessHandler {
         bbc = new BigBrainCipher();
         String hashName = bbc.hashForFiles(name);
         DataFile dataDAO = new DataFile();
+        File dir = new File("files/temp/");
+        if (!dir.exists()) {
+            dir.mkdir();
+
+        }
         try {
             dataDAO = dbClient.getDataAccess(hashName, UserSingleton.getInstance().getUser().getId());
         } catch (SQLException e) {
@@ -237,7 +253,8 @@ public class DataAccessHandler {
             privateKey = dbClient.getPrivateKey(UserSingleton.getInstance().getUser());
         } catch (SQLException e) {
 
-            uiOutputs.dataCorrupt();
+            Crasher crasher = new Crasher();
+            crasher.systemCrasher();
             // Nutzer hat keinen PrivateKey mehr oder wurde gelöscht
         }
         bbc = new BigBrainCipher(new PBEFactory());
@@ -261,7 +278,12 @@ public class DataAccessHandler {
         try {
 
             fE.setNotarReadInfo(getNotarInfoFromDao(dataDAO));
-            fE.showFile(aesKey, name);
+
+            fE.decryptFile(aesKey, name, "files/temp/");
+            FilePresenter fp = new FilePresenter();
+            File tempFile = new File("files/temp/" + fE.extractFileName(name));
+            fp.openFile(tempFile.getAbsolutePath());
+            tempFile.deleteOnExit();
             privateKey = null;
             aesKey = null;
             return 0;
@@ -280,77 +302,28 @@ public class DataAccessHandler {
 
     }
 
-    public int test(String name, String privateKey, String ablageOrt) {
-        FileEncrypter fE = new FileEncrypter();
+    public int removeFile(String datei) {
 
-        bbc = new BigBrainCipher(new RSAFactory());
-
-        String hashName = bbc.hashForFiles(name);
-        DataFile dataDAO = new DataFile();
+        String hashName = bbc.hashForFiles(datei);
+        DataFile fileDAO;
         try {
-            dataDAO = dbClient.getDataAccess(hashName, UserSingleton.getInstance().getUser().getId());
-        } catch (SQLException e) {
-            return 4;
-        }
-
-        if (dataDAO == null) {
-            System.out.println("you cannot access this file");
-            return 4;
-        }
-
-        bbc = new BigBrainCipher(new RSAFactory());
-        String aesKey = null;
-        try {
-            String notarEncryptedKey = fE.getNotarEncryptedKey("files/encryptedFiles/" + hashName);
-            String notarInfoDecrypted = bbc.getFactory().decrypt(privateKey, notarEncryptedKey.getBytes());
-            aesKey = notarInfoDecrypted.split(" ")[0];
-        } catch (Exception e) {
-            aesKey = null;
-        }
-
-        try {
-            fE.setNotarReadInfo(true);
-            fE.decryptFile(aesKey, name, ablageOrt);
-            privateKey = null;
-            aesKey = null;
-            return 0;
-        } catch (FileNotFoundException e) {
-            privateKey = null;
-            aesKey = null;
-            return 1;
-
-        } catch (Exception e) {
-            privateKey = null;
-            aesKey = null;
-            return 3;
-        }
-    }
-
-    public void recoverAllFilesInDirectory(String filepath, String privateKey, String ablageOrt) {
-        File directory = new File(filepath);
-        File[] directoryListing = directory.listFiles();
-
-        if (directoryListing != null) {
-            for (File child : directoryListing) {
-                String fileName = child.getName();
-
-                FileEncrypter fE = new FileEncrypter();
-                BigBrainCipher cipher = new BigBrainCipher(new RSAFactory());
-                try {
-                    String notarInfoEncrypted = fE.getNotarEncryptedKey(filepath + fileName);
-                    String notarInfoDecrypted = cipher.getFactory().decrypt(privateKey, notarInfoEncrypted.getBytes());
-                    String AESKey = notarInfoDecrypted.split(" ")[0];
-                    String fileNameDecrypted = notarInfoDecrypted.split(" ")[1];
-
-                    fE.setNotarReadInfo(true);
-                    fE.decryptFile(AESKey, fileNameDecrypted, ablageOrt);
-
-                } catch (Exception e) {
-                    continue;
-                }
-
+            fileDAO = dbClient.getDataAccess(hashName, UserSingleton.getInstance().getUser().getId());
+            if (fileDAO == null) {
+                return 2;
             }
+            if (!fileDAO.MasterId.equals(UserSingleton.getInstance().getUser().getId())) {
+                dbClient.deleteDataSlave(UserSingleton.getInstance().getUser(), hashName);
+            } else {
+                dbClient.deleteDataMaster(UserSingleton.getInstance().getUser(), hashName);
+            }
+        } catch (SQLException e) {
+            return 1;
         }
+        FileEncrypter fe = new FileEncrypter();
+        fe.deleteFile(hashName);
+
+        return 0;
+
     }
 
     private Boolean getNotarInfoFromDao(DataFile dao) {
@@ -359,7 +332,8 @@ public class DataAccessHandler {
         try {
             masterUserOfFile = client.getUser(dao.MasterId);
         } catch (SQLException e) {
-            uiOutputs.dataCorrupt(); // da der User fehlt aufeinmal
+            Crasher crasher = new Crasher();
+            crasher.systemCrasher(); // da der User fehlt aufeinmal
         }
 
         if (masterUserOfFile.getNotarFlag() == true) {

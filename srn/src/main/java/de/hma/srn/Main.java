@@ -9,18 +9,16 @@ public class Main {
 
         DbClient dbController = DbClient.getInstance();
 
-        /*
-         * dbController.deleteTable("users");
-         * dbController.deleteTable("publicKeys");
-         * dbController.deleteTable("signedPublicKeys");
-         * dbController.deleteTable("dataAccess");
-         */
+        // dbController.deleteTable("users");
+        // dbController.deleteTable("publicKeys");
+        // dbController.deleteTable("signedPublicKeys");
+        // dbController.deleteTable("dataAccess");
         dbController.createUserTable();
         dbController.createDataAccessTable();
         dbController.createPublicKeyTable();
         dbController.createSignedPublicKeyTable();
-        String OS = System.getProperty("os.name");
-        ConsoleMenu cm = new ConsoleMenu(OS);
+
+        ConsoleMenu cm = new ConsoleMenu();
         cm.terminal();
 
     }

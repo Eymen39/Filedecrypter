@@ -1,22 +1,73 @@
 package de.hma.srn.ui;
 
 import java.io.Console;
-import de.hma.srn.domain.ConsoleHandler;
+import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Supplier;
+
+import org.jline.reader.*;
+import org.jline.reader.impl.LineReaderImpl;
+import org.jline.reader.impl.completer.StringsCompleter;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
+
+import de.hma.srn.domain.ConsoleInputHandler;
+import de.hma.srn.domain.CustomParser;
 import de.hma.srn.domain.DataAccessHandler;
 import de.hma.srn.domain.UserSingleton;
 import de.hma.srn.domain.BigBrainCipher.BigBrainCipher;
 
 public class ConsoleMenu {
-    ConsoleHandler cmd;
+    ConsoleInputHandler cmd;
     UIOutputs uiOutputs = new UIOutputs();
     BigBrainCipher bbc;
+    LineReader reader;
+    Terminal terminal;
     String mainColor = KonsolenFarbe.RESET.getCode();
+    Boolean isLoggedIn = false;
+    Supplier<Boolean> LoggedInStatus = () -> isLoggedIn;
 
-    public ConsoleMenu(String osName) {
-        this.cmd = new ConsoleHandler();
+    public ConsoleMenu() {
+        this.cmd = new ConsoleInputHandler();
+        this.cmd = new ConsoleInputHandler();
     }
 
     public void terminal() {
+        CustomParser parser = new CustomParser();
+        parser.setEscapeChars(null);
+        terminal = null;
+        try {
+            terminal = TerminalBuilder.builder()
+                    .system(true)
+                    .jna(true)
+                    .build();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        reader = LineReaderBuilder.builder()
+                .terminal(terminal)
+                .parser(parser)
+                .build();
+        // CustomCompleter customCompleter = new CustomCompleter(LoggedInStatus);
+        Set<String> commands = new HashSet<>();
+        commands.add("register");
+        commands.add("login");
+        commands.add("logout");
+        commands.add("addfile");
+        commands.add("readfile");
+        commands.add("adduser");
+        commands.add("removeuser");
+        commands.add("deletefile");
+        commands.add("showusers");
+        commands.add("ls");
+        commands.add("help");
+        commands.add("exit");
+        Completer completer = new StringsCompleter(commands);
+
+        ((LineReaderImpl) reader).setCompleter(completer);
+
         Console console = System.console();
         if (console == null) {
             System.out.println("Konsole ist null");
@@ -27,14 +78,16 @@ public class ConsoleMenu {
         while (!notarExists) {
             if (!cmd.checkIfNotarExists()) {
                 console.printf(KonsolenFarbe.COMMAND.getCode()
-                        + "Es existiert noch kein Notar bitte geben sie den Public Key des Notaren an\n");
-                String publicKeyNotar = console.readLine();
-                console.printf(KonsolenFarbe.COMMAND.getCode() + "geben sie den Publickey nocheinmal ein\n");
-                String publicKeyAgain = console.readLine();
-                if (cmd.registerCheck(publicKeyNotar, publicKeyAgain, "Notar") == 0) {
-                    cmd.registerNotar(publicKeyAgain);
+                        + "Es existiert noch kein Notar bitte geben sie eine .pem Datei die den PublicKey des Notaren enthält ein(Dieser Key muss PKCS#8 und das Schlüsselpaar muss 4096 Bit enthalten) \n");
+                String pemFilePfad = console.readLine();
+                console.printf(
+                        KonsolenFarbe.COMMAND.getCode()
+                                + "Sind sie sich sicher das diese Datei richtig ist? [Y/N](default N): \n");
+                if (console.readLine().toLowerCase().equals("y")) {
+                    cmd.registerNotar(pemFilePfad);
                 } else {
                     uiOutputs.notarRegisterError();
+                    System.exit(0);
                 }
 
             } else {
@@ -45,11 +98,12 @@ public class ConsoleMenu {
         while (true) {
 
             bbc = new BigBrainCipher();
-            String input = console.readLine();
+            String input = reader.readLine(">>> ");
+
             String[] worte = input.split("\\s+");
 
             if (worte.length == 0) {
-                System.out.println(mainColor + "Geben sie bitte help ein" + mainColor);
+                System.out.println(KonsolenFarbe.COMMAND.getCode() + "Geben sie bitte help ein" + mainColor);
             } else {
 
                 String befehl = worte[0];
@@ -57,32 +111,31 @@ public class ConsoleMenu {
                 switch (befehl.toLowerCase()) {
 
                     case "login" -> {
-                        if (!UserSingleton.getInstance().getUser().getId().equals("")) {
-                            System.out.println(
-                                    "Sie sind schon angemeldet wollen sie sich abmelden und fortfahren? (Y/N)");
-                            if (console.readLine().toLowerCase().equals("y")) {
-                                cmd.logout();
-                                mainColor = KonsolenFarbe.RESET.getCode();
-                            } else if (console.readLine().toLowerCase().equals("n")) {
 
-                            }
-                        }
                         if (worte.length > 1) {
-                            uiOutputs.loginInputError();
+                            uiOutputs.loginInputError(mainColor);
                         } else {
-                            console.printf(mainColor + "Geben sie ihr Benutzername ein\n" + mainColor);
-                            String userName = console.readLine();
 
-                            console.printf(mainColor + "Geben sie ihr Password ein\n" + mainColor);
-                            String password = new String(console.readPassword());
+                            if (alreadyLoggedIn()) {
 
-                            if (cmd.login(userName, password)) {
-                                password = null;
-                                mainColor = KonsolenFarbe.LOGIN.getCode();
+                                String userName = reader
+                                        .readLine(mainColor + "Geben sie ihr Benutzername ein: " + mainColor);
 
+                                String password = reader.readLine(
+                                        KonsolenFarbe.COMMAND.getCode() + "Geben sie ihr Password ein: " + mainColor,
+                                        '*');
+
+                                if (cmd.login(userName, password)) {
+                                    password = null;
+                                    mainColor = KonsolenFarbe.LOGIN.getCode();
+                                    isLoggedIn = true;
+
+                                } else {
+                                    password = null;
+                                    uiOutputs.loginError();
+                                }
                             } else {
-                                password = null;
-                                uiOutputs.loginError();
+                                alreadyLoggedIn();
                             }
                         }
                     }
@@ -90,67 +143,67 @@ public class ConsoleMenu {
                     case "logout" -> {
                         cmd.logout();
                         mainColor = KonsolenFarbe.RESET.getCode();
+                        isLoggedIn = false;
                     }
 
                     case "register" -> {
 
                         if (worte.length > 1) {
-                            uiOutputs.registerInputErrors();
+                            uiOutputs.registerInputErrors(mainColor);
                         } else {
+                            if (alreadyLoggedIn()) {
 
-                            console.printf(mainColor + "Geben sie einen Benutzernamen ein\n");
-                            String userNamer = console.readLine();
+                                String userNamer = reader.readLine(mainColor + "Geben sie einen Benutzernamen ein: ");
 
-                            console.printf(mainColor + "Geben sie ihr Password ein\n");
-                            String password = new String(console.readPassword());
+                                String password = reader.readLine(mainColor + "Geben sie ihr Password ein: ", '*');
 
-                            console.printf(mainColor + "Geben sie das Password erneut ein\n");
-                            String passwordagain = new String(console.readPassword());
+                                String passwordagain = reader.readLine(
+                                        KonsolenFarbe.COMMAND.getCode() + "Geben sie das Password erneut ein: ",
+                                        '*');
 
-                            switch (cmd.registerCheck(password, passwordagain, userNamer)) {
+                                switch (cmd.registerCheck(password, passwordagain, userNamer)) {
 
-                                case 0 -> {
+                                    case 0 -> {
 
-                                    System.out.println(
-                                            "wollen sie das ihre Daten mithilfe eines Notars gesichert werden Y/N");
-                                    Boolean notarFlag = false;
-                                    String notarFlagentscheidung = console.readLine();
-                                    if (notarFlagentscheidung.equals("y")) {
-                                        notarFlag = true;
-                                        console.printf(mainColor + "mit Notar arbeiten\n");
+                                        Boolean notarFlag = false;
+                                        String notarFlagentscheidung = reader.readLine(KonsolenFarbe.COMMAND.getCode() +
+                                                "wollen sie das ihre Daten mithilfe eines Notars gesichert werden [Y/N](default N): "
+                                                + mainColor)
+                                                .toLowerCase();
+                                        if (notarFlagentscheidung.equals("y")) {
+                                            notarFlag = true;
+                                            System.out.println(
+                                                    mainColor + "Es wird mit dem Notar gearbeitet" + mainColor);
 
-                                    } else if (notarFlagentscheidung.equals("n")) {
-                                        notarFlag = false;
-                                        console.printf(mainColor + "ohne Notar arbeiten\n");
-
+                                        } else {
+                                            notarFlag = false;
+                                            System.out.println(mainColor + "Es wird ohne Notar gearbeitet" + mainColor);
+                                        }
+                                        cmd.register(userNamer, password, notarFlag);
+                                        mainColor = KonsolenFarbe.LOGIN.getCode();
+                                        password = null;
+                                        passwordagain = null;
+                                        isLoggedIn = true;
                                     }
 
-                                    cmd.register(userNamer, password, notarFlag);
+                                    case 1 -> {
+                                        uiOutputs.registerPasswordError();
+                                        password = null;
+                                        passwordagain = null;
+                                    }
+                                    case 2 -> {
+                                        uiOutputs.registerNameError();
+                                        password = null;
+                                        passwordagain = null;
 
-                                    mainColor = KonsolenFarbe.LOGIN.getCode();
-
-                                    password = null;
-                                    passwordagain = null;
-
-                                }
-
-                                case 1 -> {
-                                    uiOutputs.registerPasswordError();
-                                    password = null;
-                                    passwordagain = null;
-                                }
-                                case 2 -> {
-                                    uiOutputs.registerNameError();
-                                    password = null;
-                                    passwordagain = null;
+                                    }
+                                    case 3 -> {
+                                        uiOutputs.registerNameEmpty();
+                                        password = null;
+                                        passwordagain = null;
+                                    }
 
                                 }
-                                case 3 -> {
-                                    uiOutputs.registerNameEmpty();
-                                    password = null;
-                                    passwordagain = null;
-                                }
-
                             }
 
                         }
@@ -161,14 +214,13 @@ public class ConsoleMenu {
 
                         if (worte.length == 2) {
                             DataAccessHandler dAH = new DataAccessHandler();
-                            if (UserSingleton.getInstance().getUser().getId().equals("")) {
-                                System.out.println("sie müssen dafür angemeldet sein");
-                            } else {
-                                uiOutputs.addFileOutput(dAH.addFile(worte[1]), worte[1]);
+                            if (loginRequired()) {
+
+                                uiOutputs.addFileOutput(dAH.addFile(worte[1]), worte[1], mainColor);
 
                             }
                         } else {
-                            uiOutputs.addFileOutput(3, "");
+                            uiOutputs.addFileOutput(4, "", mainColor);
                         }
                     }
 
@@ -178,58 +230,73 @@ public class ConsoleMenu {
 
                     }
                     case "readfile" -> {
-                        if (worte.length == 3) {
+                        if (worte.length == 2) {
 
-                            if (UserSingleton.getInstance().getUser().getId().equals("")) {
-                                System.out.println("sie müssen dafür angemeldet sein");
-                            } else {
+                            if (loginRequired()) {
 
-                                System.out.println("Geben sie ihr Password ein");
-                                String password = new String(console.readPassword());
+                                String dateiPfad = worte[1];
 
-                                cmd.readFile(worte[1], password, worte[2]);
+                                String password = reader
+                                        .readLine(mainColor + "Geben sie ihr Password ein: " + mainColor, '*');
+
+                                int returnCode = cmd.readFile(dateiPfad, password);
+                                if (returnCode == 0) {
+                                    if (reader.readLine(KonsolenFarbe.COMMAND.getCode()
+                                            + "wollen sie die Datei irgendwo ablegen? [Y/N](default N): " + mainColor)
+                                            .toLowerCase().equals("y")) {
+                                        String ablageOrt = reader
+                                                .readLine(KonsolenFarbe.COMMAND.getCode()
+                                                        + "Wo wollen sie die Datei ablegen?" + mainColor);
+                                        cmd.saveFileTo(dateiPfad, password, ablageOrt);
+                                    }
+                                }
                                 password = null;
+                                dateiPfad = null;
                             }
 
                         } else {
                             System.out.println(
-                                    "Geben sie readfile und danach den originalen Pfad der zu lesenden Datei und danach den Ablageort ein");
+                                    KonsolenFarbe.ERROR.getCode()
+                                            + "Geben sie readfile und danach den originalen Pfad der zu lesenden Datei ein"
+                                            + mainColor);
                         }
 
                     }
                     case "ls" -> {
-                        if (UserSingleton.getInstance().getUser().getId().equals("")) {
-                            System.out.println("Melden sie sich zuerst an");
-                        } else {
-                            System.out.println("geben sie ihr Password ein");
-                            String password = new String(console.readPassword());
+                        if (loginRequired()) {
+
+                            String password = reader.readLine(
+                                    KonsolenFarbe.COMMAND.getCode() + "geben sie ihr Password ein: " + mainColor, '*');
                             if (UserSingleton.getInstance().getUser().getPassword()
                                     .equals(bbc.hash(password.getBytes()))) {
 
                                 System.out.println("--------------------");
                                 for (String s : cmd.listData(password)) {
                                     password = null;
-                                    System.out.println(s);
+                                    System.out.println(mainColor + s);
                                 }
-
+                                password = null;
                             } else {
-                                System.out.println("Das Password war falsch");
+                                System.out
+                                        .println(KonsolenFarbe.ERROR.getCode() + "Das Password war falsch" + mainColor);
+                                password = null;
                             }
                         }
 
                     }
                     case "adduser" -> {
-                        if (UserSingleton.getInstance().getUser().getId().equals("")) {
-                            System.out.println("Melden sie sich zuerst an");
-                        } else {
+
+                        if (loginRequired()) {
                             if (worte.length != 3) {
-                                System.out.println(mainColor
-                                        + "Geben sie adduser und danach den nutzer und danach den originalpfad der Datei an");
+                                System.out.println(KonsolenFarbe.ERROR.getCode()
+                                        + "Geben sie adduser und danach den nutzer und danach den originalpfad der Datei an"
+                                        + mainColor);
                             } else {
                                 String userToAdd = worte[1];
                                 String fileToAdd = worte[2];
-                                System.out.println("Geben sie bitte ihr Password ein");
-                                String password = new String(console.readPassword());
+
+                                String password = reader.readLine(KonsolenFarbe.COMMAND.getCode()
+                                        + "Geben sie bitte ihr Password ein: " + mainColor, '*');
                                 cmd.addUsertoFile(userToAdd, fileToAdd, password);
                                 password = null;
 
@@ -238,22 +305,57 @@ public class ConsoleMenu {
 
                     }
                     case "removeuser" -> {
-                        if (UserSingleton.getInstance().getUser().getId().equals("")) {
-                            System.out.println("Melden sie sich zuerst an");
-                        } else {
+                        if (loginRequired()) {
                             if (worte.length != 3) {
-                                System.out.println(mainColor
-                                        + "Geben sie removeuser und danach den nutzer und danach den originalpfad der Datei an");
+                                System.out.println(KonsolenFarbe.ERROR.getCode()
+                                        + "Geben sie removeuser und danach den nutzer und danach den originalpfad der Datei an"
+                                        + mainColor);
                             } else {
                                 String userToAdd = worte[1];
                                 String fileToAdd = worte[2];
                                 cmd.removeUserFromFile(userToAdd, fileToAdd);
                             }
+
                         }
 
                     }
+                    case "showusers" -> {
+                        if (loginRequired()) {
+                            cmd.showUsers();
+
+                        }
+
+                    }
+                    case "deletefile" -> {
+                        if (loginRequired()) {
+                            if (worte.length != 2) {
+                                System.out.println(
+                                        KonsolenFarbe.ERROR.getCode() + "falsch benutzung des Befehls" + mainColor);
+                            }
+                            String dateiPfad = worte[1];
+                            if (reader
+                                    .readLine(KonsolenFarbe.COMMAND.getCode() + "Sind sie Sicher ob sie die Datei "
+                                            + dateiPfad
+                                            + " löschen wollen [Y/N](default N): " + mainColor)
+                                    .toLowerCase().equals("y")) {
+                                cmd.deleteFile(dateiPfad);
+
+                            }
+
+                        }
+                    }
+
+                    case "exit" -> {
+                        if (!UserSingleton.getInstance().getUser().getId().equals("")) {
+                            cmd.logout();
+                        }
+                        System.out.println("Auf Wiedersehen!");
+                        System.exit(0);
+                    }
+
                     default -> {
-                        System.out.println("mit help bekommen sie alle Befehle angezeigt");
+                        System.out.println(KonsolenFarbe.COMMAND.getCode()
+                                + "mit help bekommen sie alle Befehle angezeigt" + mainColor);
                     }
 
                 }
@@ -261,6 +363,35 @@ public class ConsoleMenu {
             }
 
         }
+
+    }
+
+    private boolean loginRequired() {
+        if (!isLoggedIn) {
+            System.out.println(mainColor + "sie müssen angemeldet sein dafür" + mainColor);
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    private boolean alreadyLoggedIn() {
+        if (!UserSingleton.getInstance().getUser().getId().equals("")) {
+            System.out.println(
+                    KonsolenFarbe.ERROR.getCode() + "Sie sind schon angemeldet wollen sie sich abmelden und fortfahren?"
+                            + mainColor);
+            String confirm = reader.readLine("[Y/N](dafault: N): ").toLowerCase();
+            if (confirm.equals("y")) {
+                cmd.logout();
+                mainColor = KonsolenFarbe.RESET.getCode();
+                isLoggedIn = false;
+                return true;
+            } else
+                uiOutputs.cantBeLoggedInError();
+            return false;
+
+        }
+        return true;
     }
 
 }

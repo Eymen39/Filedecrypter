@@ -65,6 +65,7 @@ public class DataValidator {
                 client.deleteTable("publicKeys");
                 client.deleteTable("signedPublicKeys");
                 client.deleteTable("dataAccess");
+                System.exit(0);
                 return false;
             }
         }

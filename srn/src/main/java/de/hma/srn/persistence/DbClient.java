@@ -306,7 +306,7 @@ public class DbClient {
         ResultSet rs = null;
         try (Connection conn = DriverManager.getConnection(url)) {
             PreparedStatement statement = conn
-                    .prepareStatement("SELECT name FROM users");
+                    .prepareStatement("SELECT name FROM users WHERE name != 'notar'");
             rs = statement.executeQuery();
             if (rs != null) {
                 while (rs.next()) {
@@ -314,7 +314,7 @@ public class DbClient {
                 }
             }
         } catch (Exception e) {
-            throw new SQLException();
+            throw new SQLException(e);
         }
 
         return aL;
@@ -474,6 +474,34 @@ public class DbClient {
 
     }
 
+    public void deleteDataMaster(User user, String hashName) throws SQLException {
+
+        try (Connection conn = DriverManager.getConnection(url)) {
+            PreparedStatement statement = conn
+                    .prepareStatement("DELETE FROM dataAccess where ( masterid=?)AND (hashname=?) ");
+            statement.setString(1, user.getId());
+            statement.setString(2, hashName);
+            statement.executeUpdate();
+
+        } catch (Exception e) {
+            throw new SQLException();
+        }
+
+    }
+
+    public void deleteDataSlave(User user, String hashName) throws SQLException {
+        try (Connection conn = DriverManager.getConnection(url)) {
+            PreparedStatement statement = conn
+                    .prepareStatement("DELETE FROM dataAccess where ( slaveId=?)AND (hashname=?) ");
+            statement.setString(1, user.getId());
+            statement.setString(2, hashName);
+            statement.executeUpdate();
+
+        } catch (Exception e) {
+            throw new SQLException();
+        }
+    }
+
     public User getUser(String uuid) throws SQLException {
         ResultSet rs = null;
         try (Connection conn = DriverManager.getConnection(url)) {
@@ -496,6 +524,35 @@ public class DbClient {
             throw new SQLException();
         }
 
+    }
+
+    public ArrayList<DataFile> getDataAccessOf1File(String dateiName) throws SQLException {
+
+        ArrayList<DataFile> aL = new ArrayList<>();
+        ResultSet rs = null;
+        try (Connection conn = DriverManager.getConnection(url)) {
+
+            PreparedStatement statement = conn.prepareStatement("SELECT * FROM dataAccess where hashname=?");
+            statement.setString(1, dateiName);
+            rs = statement.executeQuery();
+            if (rs != null) {
+                while (rs.next()) {
+                    DataFile data = new DataFile();
+                    data.hashname = dateiName;
+                    data.name = rs.getString("name");
+                    data.AESkey = rs.getString("KeyConstruct");
+                    data.MasterId = rs.getString("masterid");
+                    data.SlaveId = rs.getString("slaveid");
+
+                    aL.add(data);
+
+                }
+                return aL;
+            }
+            return null;
+        } catch (SQLException e) {
+            throw new SQLException();
+        }
     }
 
 }

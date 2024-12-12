@@ -4,6 +4,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Base64;
 
+import de.hma.srn.domain.UserSingleton;
+
 public class BigBrainCipher {
 
     ICipherFactory factory;
@@ -55,6 +57,9 @@ public class BigBrainCipher {
         if (digest == null) {
             return null;
         }
+
+        // String name = UserSingleton.getInstance().getUser().getName();
+        // data = data + name;
         byte[] hashDataBytes = digest.digest(data.getBytes(StandardCharsets.UTF_8));
         String base64EncodedHash = Base64.getUrlEncoder().withoutPadding().encodeToString(hashDataBytes);
         return base64EncodedHash.replaceAll("[^a-zA-Z0-9_-]", "_");

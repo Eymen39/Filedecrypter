@@ -1,8 +1,7 @@
 package de.hma.srn;
 
-import de.hma.srn.persistence.DbClient;
-
-import de.hma.srn.ui.ConsoleMenu;
+import de.eymen.filedecrypter.gui.persistence.DbClient;
+import de.eymen.filedecrypter.gui.ui.ConsoleMenu;
 
 public class Main {
     public static void main(String[] args) throws Exception {

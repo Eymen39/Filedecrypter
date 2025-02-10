@@ -11,12 +11,12 @@ import de.eymen.filedecrypter.domain.BigBrainCipher.PBEFactory;
 import de.eymen.filedecrypter.domain.BigBrainCipher.RSAFactory;
 import de.eymen.filedecrypter.persistence.DbClient;
 
-public class ConsoleInputHandler {
+public class InputGUIHandler {
 
     private DbClient dbClient;
     BigBrainCipher bbc;
 
-    public ConsoleInputHandler() {
+    public InputGUIHandler() {
         dbClient = DbClient.getInstance();
         bbc = new BigBrainCipher();
 
@@ -33,7 +33,6 @@ public class ConsoleInputHandler {
             return success;
 
         } catch (NoSuchAlgorithmException | InvalidKeySpecException ex) {
-            // uiOutputs.loginError();
             return false;
         }
 

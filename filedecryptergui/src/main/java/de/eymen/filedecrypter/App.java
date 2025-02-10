@@ -7,6 +7,9 @@ import javafx.scene.Scene;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.sql.SQLException;
+
+import de.eymen.filedecrypter.persistence.DbClient;
 
 /**
  * JavaFX App
@@ -17,12 +20,13 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) throws IOException {
-        scene = new Scene(loadFXML("primary"), 640, 480);
+        scene = new Scene(loadFXML("register"));
         stage.setScene(scene);
+        stage.setTitle("FileCrypter");
         stage.show();
     }
 
-    static void setRoot(String fxml) throws IOException {
+    public static void setRoot(String fxml) throws IOException {
         scene.setRoot(loadFXML(fxml));
     }
 
@@ -32,6 +36,17 @@ public class App extends Application {
     }
 
     public static void main(String[] args) {
+
+        DbClient dbClient = DbClient.getInstance();
+        try {
+            dbClient.createUserTable();
+            dbClient.createDataAccessTable();
+            dbClient.createPublicKeyTable();
+            dbClient.createSignedPublicKeyTable();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
         launch();
     }
 

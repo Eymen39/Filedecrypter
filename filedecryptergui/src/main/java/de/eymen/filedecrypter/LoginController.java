@@ -31,6 +31,12 @@ public class LoginController {
         Alerts a;
         if (loginSuccess) {
             System.out.println("login sucessful");
+            try {
+                App.setRoot("mainmenu");
+
+            } catch (Exception exception) {
+                exception.printStackTrace();
+            }
         } else {
             a = new WarningAlert();
             a.show("Username or Password was Wrong", "Try again");

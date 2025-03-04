@@ -25,6 +25,7 @@
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.47.0.0</version>
         </dependency>
+       
       
     </dependencies>
     <build>
@@ -34,6 +35,12 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.0</version>
                 <configuration>
+                <source>17</source>
+                <target>17</target>
+                <compilerArgs>
+                    <arg>--add-modules</arg>
+                    <arg>java.desktop</arg>
+                    </compilerArgs>
                     <release>11</release>
                 </configuration>
             </plugin>

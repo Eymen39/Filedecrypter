@@ -278,10 +278,10 @@ public class DataAccessHandler {
             fE.setNotarReadInfo(getNotarInfoFromDao(dataDAO));
 
             fE.decryptFile(aesKey, name, "files/temp/");
-            // FilePresenter fp = new FilePresenter();
+            FilePresenter fp = new FilePresenter();
             File tempFile = new File("files/temp/" + fE.extractFileName(name));
-            // fp.openFile(tempFile.getAbsolutePath());
-            // fp.openFile(tempFile.getAbsolutePath());
+            fp.openFile(tempFile.getAbsolutePath());
+            fp.openFile(tempFile.getAbsolutePath());
             tempFile.deleteOnExit();
             privateKey = null;
             aesKey = null;

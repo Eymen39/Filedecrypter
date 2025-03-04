@@ -10,6 +10,7 @@ import de.eymen.filedecrypter.domain.BigBrainCipher.BigBrainCipher;
 import de.eymen.filedecrypter.domain.BigBrainCipher.PBEFactory;
 import de.eymen.filedecrypter.domain.BigBrainCipher.RSAFactory;
 import de.eymen.filedecrypter.persistence.DbClient;
+import javafx.scene.chart.PieChart.Data;
 
 public class InputGUIHandler {
 
@@ -167,6 +168,12 @@ public class InputGUIHandler {
     public void help() {
         // helpCommand helper = new helpCommand();
         // helper.ShowAllCmd();
+
+    }
+
+    public int addfile(String url) {
+        DataAccessHandler dHandler = new DataAccessHandler();
+        return dHandler.addFile(url);
 
     }
 

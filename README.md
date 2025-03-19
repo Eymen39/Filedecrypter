@@ -9,9 +9,9 @@ Die Anwendung verwendet Jline Autocomplete, um Befehle zu erstellen und verwende
 
 
 Commands:
-        register: geben sie register ohne einen anhang an und geben sie danach eine Einzigartigen Namen und ihr Password ein welches sie immer beim anmelden benötigen werden 
-        login: geben sie login ohne anhang an um sich mit ihrem Benutzernamen und Password anzumelden
-        addfile: geben sie addfile so an um Datein zuverschlüsslen und sicher abzulegen [addfile <dateipfad>]
+        register: geben sie register ohne einen anhang an und geben sie danach eine Einzigartigen Namen und ihr Password ein welches sie immer beim anmelden benötigen werden\n
+        login: geben sie login ohne anhang an um sich mit ihrem Benutzernamen und Password anzumelden\n
+        addfile: geben sie addfile so an um Datein zuverschlüsslen und sicher abzulegen [addfile <dateipfad>]\n
         readfile: geben sie readfile an um eine Datei zu entschlüsseln und angezeigt zu bekommen.
           Falls sie diese Datei verschlüsselt haben können sie diese nach Bestätigung an einen bestimmten Ort ablegen [readfile <orginalDateiPfad>]
         logout: um sich mit dem aktuel angemeldeten Benutzer abzumelden

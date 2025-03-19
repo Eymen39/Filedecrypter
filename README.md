@@ -1,12 +1,22 @@
 FileCrypter
 
-A shell Line Application written in Java that can be used to Encrypt Files and Store them in any Destination on a Computer. 
-Multiple Users on a local Machine that can autherize eachother the access on Files.
+Eine in Java geschriebene Shell-Line-Anwendung, die verwendet werden kann, um Dateien zu verschlüsseln und an beliebigen Ablageorten auf einem Computer zu speichern. 
+Mehrere Benutzer auf einer lokalen Maschine können sich gegenseitig den Zugriff auf verschiedene verschlüsselte Dateien autherisieren.
 
-Written in Java 17, modern Crypto Algorithms are used, with the use of the Java Crypto Library.
-All Keys are safely stored in a SQLite Databank.
-The Application uses Jline Autocomplete to autocomplete commands and uses a color Scheme to differentiate between logged in Status and logged off.
+Geschrieben in Java 17, werden moderne Crypto Algorithms verwendet, mithilfe der Java Crypto Library.
+Alle Keys werden sicher in einer SQLite Databank gespeichert.
+Die Anwendung verwendet Jline Autocomplete, um Befehle zu erstellen und verwendet ein Farbschema, um zwischen angemeldetem und abgemeldetem Status zu unterscheiden.
 
 
 Commands:
-
+        register: geben sie register ohne einen anhang an und geben sie danach eine Einzigartigen Namen und ihr Password ein welches sie immer beim anmelden benötigen werden 
+        login: geben sie login ohne anhang an um sich mit ihrem Benutzernamen und Password anzumelden
+        addfile: geben sie addfile so an um Datein zuverschlüsslen und sicher abzulegen [addfile <dateipfad>]
+        readfile: geben sie readfile an um eine Datei zu entschlüsseln und angezeigt zu bekommen.
+          Falls sie diese Datei verschlüsselt haben können sie diese nach Bestätigung an einen bestimmten Ort ablegen [readfile <orginalDateiPfad>]
+        logout: um sich mit dem aktuel angemeldeten Benutzer abzumelden
+        ls: die berechtigten Datein des aktuellen Benutzers aufzulisten
+        adduser: gibt einem Nutzer die Berechtigung eine bestimtme angegebene Datei zu lesen[adduser <user> <dateipfad>]
+        removeuser: nehmt einem Nutzer die Berechtigung eine bestimtme angegebene Datei zu lesen [removeuser <user> <dateipfad>]
+        showusers: gibt alle auf diesem System registrierten Leute zurück
+        deletefile: sie können damit die angegebene verschlüsselte Datei löschen und alle Berechtigungen zu dieser Datei die von ihnen vergeben wurden entfernen. 
